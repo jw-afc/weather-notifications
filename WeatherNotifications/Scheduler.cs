@@ -17,13 +17,13 @@ namespace WeatherNotifications
 		private int _maximumWindSpeed;
 		private string _postcode;
 		private string _postcodeId;
-		
+
 		private string _alertSubject = "➹ Wind Speed Notifications";
 		private IDictionary<string, int> _weatherConditions = new Dictionary<string, int>();
 		private DateTime _executionDate = DateTime.Now;
 
 		private object _lock = new object();
-		
+
 		public static Scheduler Instance { get; } = new Scheduler();
 
 		static Scheduler()
@@ -116,16 +116,12 @@ namespace WeatherNotifications
 				sb.Append($"The forecasted wind conditions for {forecastDay.ToLower()} exceed the stated maximum ({_maximumWindSpeed} kph): ");
 
 				var day = forecasts[i].Day;
-				if (AnalyseForecastPartial(day, $"day{i}"))
+				var night = forecasts[i].Night;
+
+				if (AnalyseForecastPartial(day, $"day{i}") || AnalyseForecastPartial(night, $"night{i}"))
 				{
 					sb.Append("<br />");
 					sb.Append($" - Day {GetWindConditions(day.Wind)}");
-					alert = true;
-				}
-
-				var night = forecasts[i].Night;
-				if (AnalyseForecastPartial(night, $"night{i}"))
-				{
 					sb.Append("<br />");
 					sb.Append($" - Night {GetWindConditions(night.Wind)}");
 					alert = true;
@@ -173,7 +169,7 @@ namespace WeatherNotifications
 		}
 
 		private async void SendAlert(string subject, string content, bool important = false)
-		{			
+		{
 			var apiKey = Environment.GetEnvironmentVariable("SENDGRID_APIKEY");
 			var client = new SendGridClient(apiKey);
 

@@ -13,7 +13,7 @@ namespace WeatherModel
 		public string WeatherText { get; set; }
 
 		[JsonProperty("wind")]
-		public List<Wind> WindData { get; set; }
+		private List<Wind> WindData { get; set; }
 
 		public Wind Wind => WindData?.FirstOrDefault();
 	}

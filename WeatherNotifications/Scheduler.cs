@@ -61,7 +61,7 @@ namespace WeatherNotifications
 
 				using (var client = new WebClient())
 				{
-					var json = client.DownloadString($"http://www.myweather2.com/developer/forecast.ashx?uac={uac}&output=json&query={_postcode}");
+					var json = client.DownloadString($"http://www.myweather2.com/developer/forecast.ashx?uac={uac}&output=json&query={WebUtility.UrlEncode(_postcode)}");
 					WeatherRoot root = JsonConvert.DeserializeObject<WeatherRoot>(json);
 
 					AnalyseWeather(root.Weather);
@@ -93,13 +93,15 @@ namespace WeatherNotifications
 		{
 			if (AnalyseWind(current?.Wind, "current"))
 			{
-				var sb = new StringBuilder();
+				var sb = new StringBuilder();				
+				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
 				sb.Append("<br />");
 				sb.Append($" - Now {GetWindConditions(current?.Wind)}");
 				sb.Append("<br />");
 				sb.Append("<br />");
 				sb.Append($"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}");
+				sb.Append("</div>");
 
 				SendAlert($"{_alertSubject} - Now", sb.ToString(), true);
 			}
@@ -114,6 +116,7 @@ namespace WeatherNotifications
 				var alert = false;
 
 				var sb = new StringBuilder();
+				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The forecasted wind conditions for {forecastDay.ToLower()} exceed the stated maximum ({_maximumWindSpeed} kph): ");
 
 				var day = forecasts[i].Day;
@@ -141,7 +144,7 @@ namespace WeatherNotifications
 				{
 					sb.Append("<br />");
 					sb.Append("<br />");
-					sb.Append($"http://www.myweather2.com/activity/forecast.aspx?query={_postcode}&rt=postcode&id={_postcodeId}{(i > 0 ? "&sday=1" : string.Empty)}");
+					sb.Append($"http://www.myweather2.com/activity/forecast.aspx?query={WebUtility.UrlEncode(_postcode)}&rt=postcode&id={_postcodeId}{(i > 0 ? "&sday=1" : string.Empty)}");
 					SendAlert($"{_alertSubject} - {forecastDay}", sb.ToString());
 				}
 			}

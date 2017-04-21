@@ -11,10 +11,10 @@ namespace WeatherModel
 		public DateTime Date { get; set; }
 
 		[JsonProperty("day")]
-		public List<ForecastPartial> DayData { get; set; }
+		private List<ForecastPartial> DayData { get; set; }
 
 		[JsonProperty("night")]
-		public List<ForecastPartial> NightData { get; set; }
+		private List<ForecastPartial> NightData { get; set; }
 
 		[JsonProperty("day_max_temp")]
 		public int MaximumTemperatureDay { get; set; }

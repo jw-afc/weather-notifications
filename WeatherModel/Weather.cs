@@ -7,7 +7,7 @@ namespace WeatherModel
 	public class Weather
 	{
 		[JsonProperty("curren_weather")]
-		public List<Current> CurrentData { get; set; }
+		private List<Current> CurrentData { get; set; }
 
 		[JsonProperty("forecast")]
 		public List<Forecast> Forecasts { get; set; }

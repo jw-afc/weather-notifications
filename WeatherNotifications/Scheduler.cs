@@ -55,7 +55,7 @@ namespace WeatherNotifications
 			{
 				if (DateTime.Now.Date != _executionDate.Date) Reset();
 
-				UpdateWeatherForecastLimits();
+				UpdateRuntimeVariables();
 
 				var uac = Environment.GetEnvironmentVariable("WEATHER2_UAC");
 
@@ -71,11 +71,12 @@ namespace WeatherNotifications
 
 		private void Reset()
 		{
-			_executionDate = new DateTime();
+			Console.WriteLine("reset");
+			_executionDate = DateTime.Now;
 			_weatherConditions = new Dictionary<string, int>();
 		}
 
-		private void UpdateWeatherForecastLimits()
+		private void UpdateRuntimeVariables()
 		{
 			_maximumWindSpeed = int.Parse(Environment.GetEnvironmentVariable("MAXIMUM_WIND_SPEED_IN_KPH"));
 			_postcode = Environment.GetEnvironmentVariable("WEATHER2_POSTCODE");
@@ -118,7 +119,16 @@ namespace WeatherNotifications
 				var day = forecasts[i].Day;
 				var night = forecasts[i].Night;
 
-				if (AnalyseForecastPartial(day, $"day{i}") || AnalyseForecastPartial(night, $"night{i}"))
+				if (AnalyseForecastPartial(day, $"day{i}"))
+				{
+					sb.Append("<br />");
+					sb.Append($" - Day {GetWindConditions(day.Wind)}");
+					sb.Append("<br />");
+					sb.Append($" - Night {GetWindConditions(night.Wind)}");
+					alert = true;
+				}
+				
+				if (AnalyseForecastPartial(night, $"night{i}") && !alert)
 				{
 					sb.Append("<br />");
 					sb.Append($" - Day {GetWindConditions(day.Wind)}");
@@ -146,18 +156,15 @@ namespace WeatherNotifications
 		{
 			if (wind != null)
 			{
-				if (wind.Speed > _maximumWindSpeed)
+				if (_weatherConditions.ContainsKey(descriptor))
 				{
-					if (_weatherConditions.ContainsKey(descriptor))
-					{
-						var previous = _weatherConditions[descriptor];
-						if (wind.Speed > previous) return true;
-					}
-					else
-					{
-						_weatherConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
-						return true;
-					}
+					var previous = _weatherConditions[descriptor];
+					if (wind.Speed > previous) return wind.Speed > _maximumWindSpeed;
+				}
+				else
+				{
+					_weatherConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
+					return wind.Speed > _maximumWindSpeed;
 				}
 			}
 			return false;
@@ -170,8 +177,7 @@ namespace WeatherNotifications
 
 		private async void SendAlert(string subject, string content, bool important = false)
 		{
-			var apiKey = Environment.GetEnvironmentVariable("SENDGRID_APIKEY");
-			var client = new SendGridClient(apiKey);
+			var client = new SendGridClient(Environment.GetEnvironmentVariable("SENDGRID_APIKEY"));
 
 			// Send a Single Email using the Mail Helper with convenience methods and initialized SendGridMessage object
 			var msg = new SendGridMessage()
@@ -195,9 +201,9 @@ namespace WeatherNotifications
 			msg.AddTo(new EmailAddress(Environment.GetEnvironmentVariable("RECIPIENT")));
 
 			var response = await client.SendEmailAsync(msg);
+
 			Console.WriteLine(msg.Serialize());
 			Console.WriteLine(response.StatusCode);
-			Console.WriteLine(response.Headers);
 		}
 
 		public void Dispose()

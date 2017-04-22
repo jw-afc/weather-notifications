@@ -91,13 +91,14 @@ namespace WeatherNotifications
 
 		private void AnalyseCurrent(Current current)
 		{
-			if (AnalyseWind(current?.Wind, "current"))
+			var result = AnalyseWind(current?.Wind, "current");
+			if (result.Item1)
 			{
 				var sb = new StringBuilder();				
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
 				sb.Append("<br />");
-				sb.Append($" - Now {GetWindConditions(current?.Wind)}");
+				sb.Append($" - Now {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
 				sb.Append("<br />");
 				sb.Append("<br />");
 				sb.Append($"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}");
@@ -122,21 +123,24 @@ namespace WeatherNotifications
 				var day = forecasts[i].Day;
 				var night = forecasts[i].Night;
 
-				if (AnalyseForecastPartial(day, $"day{i}"))
+				var dayResult = AnalyseForecastPartial(day, $"day{i}");
+				var nightResult = AnalyseForecastPartial(night, $"night{i}");
+
+				if (dayResult.Item1)
 				{
 					sb.Append("<br />");
-					sb.Append($" - Day {GetWindConditions(day.Wind)}");
+					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayResult.Item2, day.Wind.Unit)}");
 					sb.Append("<br />");
-					sb.Append($" - Night {GetWindConditions(night.Wind)}");
+					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightResult.Item2, day.Wind.Unit)}");
 					alert = true;
 				}
 				
-				if (AnalyseForecastPartial(night, $"night{i}") && !alert)
+				if (nightResult.Item1 && !alert)
 				{
 					sb.Append("<br />");
-					sb.Append($" - Day {GetWindConditions(day.Wind)}");
+					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayResult.Item2, day.Wind.Unit)}");
 					sb.Append("<br />");
-					sb.Append($" - Night {GetWindConditions(night.Wind)}");
+					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightResult.Item2, day.Wind.Unit)}");
 					alert = true;
 				}
 
@@ -150,12 +154,18 @@ namespace WeatherNotifications
 			}
 		}
 
-		private bool AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)
+		private string GetChangeIndicator(int change, string unit)
 		{
-			return forecastPartial != null ? AnalyseWind(forecastPartial.Wind, descriptor) : false;
+			if (change == 0) return string.Empty;
+			return $" ({(change < 0 ? "⇩" : "⇧")} {Math.Abs(change)} {unit})"; 
 		}
 
-		private bool AnalyseWind(Wind wind, string descriptor)
+		private Tuple<bool, int> AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)
+		{
+			return forecastPartial != null ? AnalyseWind(forecastPartial.Wind, descriptor) : new Tuple<bool, int>(false, 0);
+		}
+
+		private Tuple<bool, int> AnalyseWind(Wind wind, string descriptor)
 		{
 			if (wind != null)
 			{
@@ -165,16 +175,16 @@ namespace WeatherNotifications
 					if (wind.Speed != previous)
 					{
 						_weatherConditions[descriptor] = wind.Speed;
-						return wind.Speed > _maximumWindSpeed;
+						return new Tuple<bool, int>(wind.Speed > _maximumWindSpeed, wind.Speed - previous);
 					}
 				}
 				else
 				{
 					_weatherConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
-					return wind.Speed > _maximumWindSpeed;
+					return new Tuple<bool, int>(wind.Speed > _maximumWindSpeed, 0);
 				}
 			}
-			return false;
+			return new Tuple<bool, int>(false, 0);
 		}
 
 		private string GetWindConditions(Wind wind)

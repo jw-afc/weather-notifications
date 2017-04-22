@@ -20,7 +20,7 @@ namespace WeatherNotifications
 
 		private string _alertSubject = "➹ Wind Speed Notifications";
 		private IDictionary<string, int> _weatherConditions = new Dictionary<string, int>();
-		private DateTime _executionDate = DateTime.Now;
+		private DateTime _executionDate = DateTime.UtcNow;
 
 		private object _lock = new object();
 
@@ -53,7 +53,7 @@ namespace WeatherNotifications
 		{
 			lock (_lock)
 			{
-				if (DateTime.Now.Date != _executionDate.Date) Reset();
+				if (DateTime.UtcNow.Date != _executionDate.Date) Reset();
 
 				UpdateRuntimeVariables();
 
@@ -71,8 +71,8 @@ namespace WeatherNotifications
 
 		private void Reset()
 		{
-			Console.WriteLine("reset");
-			_executionDate = DateTime.Now;
+			Console.WriteLine($"reset");
+			_executionDate = DateTime.UtcNow;
 			_weatherConditions = new Dictionary<string, int>();
 		}
 
@@ -116,7 +116,7 @@ namespace WeatherNotifications
 				var alert = false;
 
 				var sb = new StringBuilder();
-				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
+				sb.Append($"<div><h3>Local Weather - {_postcode} - {forecasts[i].Date.ToString("dd/MM/yyyy")}</h3></div>");
 				sb.Append($"The forecasted wind conditions for {forecastDay.ToLower()} exceed the stated maximum ({_maximumWindSpeed} kph): ");
 
 				var day = forecasts[i].Day;
@@ -162,7 +162,11 @@ namespace WeatherNotifications
 				if (_weatherConditions.ContainsKey(descriptor))
 				{
 					var previous = _weatherConditions[descriptor];
-					if (wind.Speed > previous) return wind.Speed > _maximumWindSpeed;
+					if (wind.Speed != previous)
+					{
+						_weatherConditions[descriptor] = wind.Speed;
+						return wind.Speed > _maximumWindSpeed;
+					}
 				}
 				else
 				{

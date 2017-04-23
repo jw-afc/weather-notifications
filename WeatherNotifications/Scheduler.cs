@@ -3,6 +3,7 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -53,8 +54,6 @@ namespace WeatherNotifications
 		{
 			lock (_lock)
 			{
-				if (DateTime.UtcNow.Date != _executionDate.Date) Reset();
-
 				UpdateRuntimeVariables();
 
 				var uac = Environment.GetEnvironmentVariable("WEATHER2_UAC");
@@ -85,6 +84,8 @@ namespace WeatherNotifications
 
 		private void AnalyseWeather(Weather weather)
 		{
+			if ((weather?.Forecasts?.FirstOrDefault()?.Date.Date ?? DateTime.Now) != _executionDate.Date) Reset();
+
 			AnalyseCurrent(weather.Current);
 			AnalyseForecast(weather.Forecasts);
 		}
@@ -98,13 +99,13 @@ namespace WeatherNotifications
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
 				sb.Append("<br />");
-				sb.Append($" - Now {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($" - {DateTime.Now.ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
 				sb.Append("<br />");
 				sb.Append("<br />");
 				sb.Append($"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}");
 				sb.Append("</div>");
 
-				SendAlert($"{_alertSubject} - Now", sb.ToString(), true);
+				SendAlert($"{_alertSubject} - Current", sb.ToString(), true);
 			}
 		}
 
@@ -157,7 +158,7 @@ namespace WeatherNotifications
 		private string GetChangeIndicator(int change, string unit)
 		{
 			if (change == 0) return string.Empty;
-			return $" ({(change < 0 ? "⇩" : "⇧")} {Math.Abs(change)} {unit})"; 
+			return $" ({(change < 0 ? "⬇" : "⬆")} {Math.Abs(change)} {unit})"; 
 		}
 
 		private Tuple<bool, int> AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)

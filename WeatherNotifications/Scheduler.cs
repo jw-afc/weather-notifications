@@ -158,7 +158,7 @@ namespace WeatherNotifications
 		private string GetChangeIndicator(int change, string unit)
 		{
 			if (change == 0) return string.Empty;
-			return $" ({(change < 0 ? "⬇" : "⬆")} {Math.Abs(change)} {unit})"; 
+			return $" ({(change < 0 ? "⇩" : "⇧")} {Math.Abs(change)} {unit})"; 
 		}
 
 		private Tuple<bool, int> AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)

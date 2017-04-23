@@ -99,7 +99,7 @@ namespace WeatherNotifications
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
 				sb.Append("<br />");
-				sb.Append($" - {DateTime.Now.ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($" - {TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time")).ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
 				sb.Append("<br />");
 				sb.Append("<br />");
 				sb.Append($"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}");

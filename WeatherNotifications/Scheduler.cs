@@ -43,7 +43,7 @@ namespace WeatherNotifications
 			_timer.Elapsed += _timer_Elapsed;
 			_timer.Start();
 
-			_executionDate = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo);
+			_executionDate = TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo);
 
 			GetWeatherForecast();
 		}
@@ -57,7 +57,7 @@ namespace WeatherNotifications
 		{
 			lock (_lock)
 			{
-				if (_executionDate.Date != TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo).Date) Reset();
+				if (_executionDate.Date != TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).Date) Reset();
 
 				UpdateRuntimeVariables();
 
@@ -76,7 +76,7 @@ namespace WeatherNotifications
 		private void Reset()
 		{
 			Console.WriteLine("Reset");
-			_executionDate = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo);
+			_executionDate = TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo);
 			_windConditions = new Dictionary<string, int>();
 		}
 

@@ -15,14 +15,15 @@ namespace WeatherNotifications
 	public sealed class Scheduler : IDisposable
 	{
 		private Timer _timer;
+		private DateTime _executionDate;
 		private int _maximumWindSpeed;
 		private string _postcode;
 		private string _postcodeId;
 
 		private string _alertSubject = "➹ Wind Speed Notifications";
-		private IDictionary<string, int> _weatherConditions = new Dictionary<string, int>();
-		private DateTime _executionDate = DateTime.UtcNow;
-
+		private TimeZoneInfo _timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+		private IDictionary<string, int> _windConditions = new Dictionary<string, int>();
+				
 		private object _lock = new object();
 
 		public static Scheduler Instance { get; } = new Scheduler();
@@ -42,6 +43,8 @@ namespace WeatherNotifications
 			_timer.Elapsed += _timer_Elapsed;
 			_timer.Start();
 
+			_executionDate = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo);
+
 			GetWeatherForecast();
 		}
 
@@ -54,6 +57,8 @@ namespace WeatherNotifications
 		{
 			lock (_lock)
 			{
+				if (_executionDate.Date != TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo).Date) Reset();
+
 				UpdateRuntimeVariables();
 
 				var uac = Environment.GetEnvironmentVariable("WEATHER2_UAC");
@@ -70,9 +75,9 @@ namespace WeatherNotifications
 
 		private void Reset()
 		{
-			Console.WriteLine($"reset");
-			_executionDate = DateTime.UtcNow;
-			_weatherConditions = new Dictionary<string, int>();
+			Console.WriteLine("Reset");
+			_executionDate = TimeZoneInfo.ConvertTime(DateTime.UtcNow, _timeZoneInfo);
+			_windConditions = new Dictionary<string, int>();
 		}
 
 		private void UpdateRuntimeVariables()
@@ -84,22 +89,20 @@ namespace WeatherNotifications
 
 		private void AnalyseWeather(Weather weather)
 		{
-			if ((weather?.Forecasts?.FirstOrDefault()?.Date.Date ?? DateTime.Now) != _executionDate.Date) Reset();
-
 			AnalyseCurrent(weather.Current);
 			AnalyseForecast(weather.Forecasts);
 		}
 
 		private void AnalyseCurrent(Current current)
 		{
-			var result = AnalyseWind(current?.Wind, "current");
-			if (result.Item1)
+			var windCondition = AnalyseWind(current?.Wind, "current");
+			if (windCondition.Alert)
 			{
 				var sb = new StringBuilder();				
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
 				sb.Append("<br />");
-				sb.Append($" - {TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time")).ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(result.Item2, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($" - {TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(windCondition.Change, current?.Wind?.Unit ?? string.Empty)}");
 				sb.Append("<br />");
 				sb.Append("<br />");
 				sb.Append($"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}");
@@ -124,24 +127,24 @@ namespace WeatherNotifications
 				var day = forecasts[i].Day;
 				var night = forecasts[i].Night;
 
-				var dayResult = AnalyseForecastPartial(day, $"day{i}");
-				var nightResult = AnalyseForecastPartial(night, $"night{i}");
+				var dayWindCondition = AnalyseForecastPartial(day, $"day{i}");
+				var nightWindCondition = AnalyseForecastPartial(night, $"night{i}");
 
-				if (dayResult.Item1)
+				if (dayWindCondition.Alert)
 				{
 					sb.Append("<br />");
-					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayResult.Item2, day.Wind.Unit)}");
+					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayWindCondition.Change, day.Wind.Unit)}");
 					sb.Append("<br />");
-					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightResult.Item2, day.Wind.Unit)}");
+					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightWindCondition.Change, day.Wind.Unit)}");
 					alert = true;
 				}
 				
-				if (nightResult.Item1 && !alert)
+				if (nightWindCondition.Alert && !alert)
 				{
 					sb.Append("<br />");
-					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayResult.Item2, day.Wind.Unit)}");
+					sb.Append($" - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayWindCondition.Change, day.Wind.Unit)}");
 					sb.Append("<br />");
-					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightResult.Item2, day.Wind.Unit)}");
+					sb.Append($" - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightWindCondition.Change, day.Wind.Unit)}");
 					alert = true;
 				}
 
@@ -161,31 +164,31 @@ namespace WeatherNotifications
 			return $" ({(change < 0 ? "⇩" : "⇧")} {Math.Abs(change)} {unit})"; 
 		}
 
-		private Tuple<bool, int> AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)
+		private WindCondition AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)
 		{
-			return forecastPartial != null ? AnalyseWind(forecastPartial.Wind, descriptor) : new Tuple<bool, int>(false, 0);
+			return forecastPartial != null ? AnalyseWind(forecastPartial.Wind, descriptor) : new WindCondition(false, 0);
 		}
 
-		private Tuple<bool, int> AnalyseWind(Wind wind, string descriptor)
+		private WindCondition AnalyseWind(Wind wind, string descriptor)
 		{
 			if (wind != null)
 			{
-				if (_weatherConditions.ContainsKey(descriptor))
+				if (_windConditions.ContainsKey(descriptor))
 				{
-					var previous = _weatherConditions[descriptor];
+					var previous = _windConditions[descriptor];
 					if (wind.Speed != previous)
 					{
-						_weatherConditions[descriptor] = wind.Speed;
-						return new Tuple<bool, int>(wind.Speed > _maximumWindSpeed, wind.Speed - previous);
+						_windConditions[descriptor] = wind.Speed;
+						return new WindCondition(wind.Speed > _maximumWindSpeed, wind.Speed - previous);
 					}
 				}
 				else
 				{
-					_weatherConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
-					return new Tuple<bool, int>(wind.Speed > _maximumWindSpeed, 0);
+					_windConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
+					return new WindCondition(wind.Speed > _maximumWindSpeed, 0);
 				}
 			}
-			return new Tuple<bool, int>(false, 0);
+			return new WindCondition(false, 0);
 		}
 
 		private string GetWindConditions(Wind wind)
@@ -227,6 +230,18 @@ namespace WeatherNotifications
 		public void Dispose()
 		{
 			_timer?.Dispose();
+		}
+	}
+
+	public class WindCondition
+	{
+		public bool Alert { get; set; }
+		public int Change { get; set; }
+
+		public WindCondition(bool alert, int change)
+		{
+			Alert = alert;
+			Change = change;
 		}
 	}
 }

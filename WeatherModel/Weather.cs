@@ -1,17 +1,9 @@
-﻿using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace WeatherModel
+﻿namespace WeatherModel
 {
 	public class Weather
 	{
-		[JsonProperty("curren_weather")]
-		private List<Current> CurrentData { get; set; }
+		public Current Current { get; set; }
 
-		[JsonProperty("forecast")]
-		public List<Forecast> Forecasts { get; set; }
-
-		public Current Current => CurrentData?.FirstOrDefault();
+		public Forecast Forecast { get; set; }
 	}
 }

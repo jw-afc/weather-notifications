@@ -44,12 +44,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Current.cs" />
-    <Compile Include="ForecastPartial.cs" />
+    <Compile Include="Timeframe.cs" />
+    <Compile Include="ForecastDay.cs" />
     <Compile Include="Forecast.cs" />
-    <Compile Include="Wind.cs" />
-    <Compile Include="WeatherRoot.cs" />
     <Compile Include="Weather.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Wind.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

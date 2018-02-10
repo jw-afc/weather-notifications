@@ -39,6 +39,7 @@
       <HintPath>..\packages\Sendgrid.9.1.1\lib\net452\SendGrid.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -53,6 +54,9 @@
     <Compile Include="Scheduler.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="private.settings.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Properties\PublishProfiles\WeatherNotifications - Web Deploy.pubxml" />

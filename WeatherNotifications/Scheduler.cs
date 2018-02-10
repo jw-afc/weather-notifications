@@ -3,8 +3,11 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Timers;
 using WeatherModel;
@@ -17,13 +20,13 @@ namespace WeatherNotifications
 		private DateTime _executionDate;
 		
 		private string _alertSubject = "➹ Wind Speed Notifications";
-		private int _maximumWindSpeed = int.Parse(Environment.GetEnvironmentVariable("MAXIMUM_WIND_SPEED_IN_KPH"));
-		private string _postcode = Environment.GetEnvironmentVariable("WEATHER2_POSTCODE");
-		private string _postcodeId = Environment.GetEnvironmentVariable("WEATHER2_POSTCODE_ID");
-		private string _uac = Environment.GetEnvironmentVariable("WEATHER2_UAC");
+		private int _maximumWindSpeed = int.Parse(ConfigurationManager.AppSettings["MAXIMUM_WIND_SPEED_IN_KPH"]);
+		private string _postcode = ConfigurationManager.AppSettings["POSTCODE"];
+		
+		private string WeatherUrl => $"{ConfigurationManager.AppSettings["WEATHER_URL_BASE"]}/{_postcode.Split(' ')[0]}".ToLower();
 
 		private TimeZoneInfo _timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
-		private IDictionary<string, int> _windConditions = new Dictionary<string, int>();
+		private IDictionary<string, decimal> _windConditions = new Dictionary<string, decimal>();
 				
 		private object _lock = new object();
 
@@ -40,46 +43,57 @@ namespace WeatherNotifications
 
 		public void Start()
 		{
-			_timer = new Timer(int.Parse(Environment.GetEnvironmentVariable("TIMER_INTERVAL_IN_SECONDS")) * 1000);
+			_timer = new Timer(int.Parse(ConfigurationManager.AppSettings["TIMER_INTERVAL_IN_SECONDS"]) * 1000);
 			_timer.Elapsed += _timer_Elapsed;
 			_timer.Start();
 
 			_executionDate = TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo);
 
-			GetWeatherForecast();
+			Execute();
 		}
 
 		private void _timer_Elapsed(object sender, ElapsedEventArgs e)
 		{
-			Task.Factory.StartNew(GetWeatherForecast);
+			Task.Factory.StartNew(Execute);
 		}
 
-		private void GetWeatherForecast()
+		private void Execute()
 		{
 			lock (_lock)
 			{
 				if (_executionDate.Date != TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).Date) Reset();
-				
-				using (var client = new WebClient())
-				{
-					var json = client.DownloadString($"http://www.myweather2.com/developer/forecast.ashx?uac={_uac}&output=json&query={WebUtility.UrlEncode(_postcode)}");
-					WeatherRoot root = JsonConvert.DeserializeObject<WeatherRoot>(json);
-					AnalyseWeather(root.Weather);
-				}
+
+				var weather = GetWeather();
+				AnalyseWeather(weather);
 			}
+		}
+
+		private string GetWeatherUrlByType(string type) => $"{ConfigurationManager.AppSettings["WEATHER_UNLOCKED_API_BASE"]}/{type}/uk.{Regex.Replace(_postcode, @"\s+", string.Empty)}?app_id={ConfigurationManager.AppSettings["WEATHER_UNLOCKED_APP_ID"]}&app_key={ConfigurationManager.AppSettings["WEATHER_UNLOCKED_APP_KEY"]}";
+
+		private Weather GetWeather()
+		{
+			var weather = new Weather();
+			using (var client = new WebClient { Headers = new WebHeaderCollection { "accept:application/json" } })
+			{
+				var json = client.DownloadString(GetWeatherUrlByType("current"));
+				weather.Current = JsonConvert.DeserializeObject<Current>(json);
+
+				json = client.DownloadString(GetWeatherUrlByType("forecast"));
+				weather.Forecast = JsonConvert.DeserializeObject<Forecast>(json);
+			}
+			return weather;
 		}
 
 		private void Reset()
 		{
-			Console.WriteLine("Reset");
 			_executionDate = TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo);
-			_windConditions = new Dictionary<string, int>();
+			_windConditions = new Dictionary<string, decimal>();
 		}
 		
 		private void AnalyseWeather(Weather weather)
 		{
 			AnalyseCurrent(weather.Current);
-			AnalyseForecast(weather.Forecasts);
+			AnalyseForecast(weather.Forecast);
 		}
 
 		private void AnalyseCurrent(Current current)
@@ -87,62 +101,54 @@ namespace WeatherNotifications
 			var windCondition = AnalyseWind(current?.Wind, "current");
 			if (windCondition.Alert)
 			{
-				var sb = new StringBuilder();				
+				var sb = new StringBuilder();
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
-				sb.Append($"<br /> - {TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).ToString("HH:mm")} {GetWindConditions(current?.Wind)}{GetChangeIndicator(windCondition.Change, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($"<br />&nbsp; - {TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).ToString("h:mm tt")} - {GetWindConditions(current?.Wind)}{GetChangeIndicator(windCondition.Change, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($"<br /><br /><a href=\"{WeatherUrl}\">{WeatherUrl}</a>");
 
-				var url = $"http://www.myweather2.com/activity/current-weather.aspx?id={_postcodeId}";
-				sb.Append($"<br /><br /><a href=\"{url}\">{url}</a>");
-				
-				SendAlert($"{_alertSubject} - Current", sb.ToString(), true);
+				SendAlert($"{_alertSubject} - Alert", sb.ToString(), true);
 			}
 		}
 
-		private void AnalyseForecast(List<Forecast> forecasts)
+		private void AnalyseForecast(Forecast forecast)
 		{
-			for (int i = 0; i < forecasts.Count; i++)
+			for (int i = 0; i < forecast.Days.Count; i++)
 			{
-				var forecastDay = (i == 0 ? "Today" : "Tomorrow");
-
 				var alert = false;
 
+				var day = forecast.Days[i];
+				var date = day.Date;
+				var forecastDay = (i == 0 ? "Today" : date.ToString("dd/MM/yyyy"));
+
 				var sb = new StringBuilder();
-				sb.Append($"<div><h3>Local Weather - {_postcode} - {forecasts[i].Date.ToString("dd/MM/yyyy")}</h3></div>");
-				sb.Append($"The forecasted wind conditions for {forecastDay.ToLower()} exceed the stated maximum ({_maximumWindSpeed} kph): ");
+				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
+				sb.Append($"The forecasted wind conditions exceed the stated maximum ({_maximumWindSpeed} kph): ");
 
-				var day = forecasts[i].Day;
-				var night = forecasts[i].Night;
+				var windCondition = AnalyseForecastDay(day, date.ToString("dd/MM/yyyy"));
 
-				var dayWindCondition = AnalyseForecastPartial(day, $"day{i}");
-				var nightWindCondition = AnalyseForecastPartial(night, $"night{i}");
-
-				if (dayWindCondition.Alert)
+				if (windCondition.Alert)
 				{
-					sb.Append($"<br /> - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayWindCondition.Change, day.Wind.Unit)}");
-					sb.Append($"<br /> - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightWindCondition.Change, day.Wind.Unit)}");
+					sb.Append($"<br /> &nbsp;- {date.ToString("dd/MM/yyyy")} - {GetWindConditions(day.Wind)}{GetChangeIndicator(windCondition.Change, day.Wind.Unit)}");
+					foreach (var timeframe in day.Timeframes.Where(p => p.Wind.Speed >= _maximumWindSpeed))
+					{
+						windCondition = AnalyseWind(timeframe.Wind, $"{timeframe.Date.ToString("dd/MM/yyyy")} {timeframe.Time}");
+						sb.Append($"<br />&nbsp;&nbsp;&nbsp; - {timeframe.Time} - {GetWindConditions(timeframe.Wind, false)}{GetChangeIndicator(windCondition.Change, timeframe.Wind.Unit)}");
+					}
 					alert = true;
 				}
 				
-				if (nightWindCondition.Alert && !alert)
-				{
-					sb.Append($"<br /> - Day {GetWindConditions(day.Wind)}{GetChangeIndicator(dayWindCondition.Change, day.Wind.Unit)}");
-					sb.Append($"<br /> - Night {GetWindConditions(night.Wind)}{GetChangeIndicator(nightWindCondition.Change, day.Wind.Unit)}");
-					alert = true;
-				}
-
 				if (alert)
 				{
-					var url = $"http://www.myweather2.com/activity/forecast.aspx?query={WebUtility.UrlEncode(_postcode)}&rt=postcode&id={_postcodeId}{(i > 0 ? "&sday=1" : string.Empty)}";
-					sb.Append($"<br /><br /><a href=\"{url}\">{url}</a>");
+					sb.Append($"<br /><br /><a href=\"{WeatherUrl}\">{WeatherUrl}</a>");
 					SendAlert($"{_alertSubject} - {forecastDay}", sb.ToString());
 				}
 			}
 		}
-		
-		private WindCondition AnalyseForecastPartial(ForecastPartial forecastPartial, string descriptor)
+				
+		private WindCondition AnalyseForecastDay(ForecastDay forecastDay, string descriptor)
 		{
-			return forecastPartial != null ? AnalyseWind(forecastPartial.Wind, descriptor) : new WindCondition(false, 0);
+			return forecastDay != null ? AnalyseWind(forecastDay.Wind, descriptor) : new WindCondition(false, 0);
 		}
 
 		private WindCondition AnalyseWind(Wind wind, string descriptor)
@@ -160,27 +166,27 @@ namespace WeatherNotifications
 				}
 				else
 				{
-					_windConditions.Add(new KeyValuePair<string, int>(descriptor, wind.Speed));
+					_windConditions.Add(new KeyValuePair<string, decimal>(descriptor, wind.Speed));
 					return new WindCondition(wind.Speed > _maximumWindSpeed, 0);
 				}
 			}
 			return new WindCondition(false, 0);
 		}
 		
-		private string GetChangeIndicator(int change, string unit)
+		private string GetChangeIndicator(decimal change, string unit)
 		{
 			if (change == 0) return string.Empty;
 			return $" ({(change < 0 ? "⇩" : "⇧")} {Math.Abs(change)} {unit})";
 		}
 
-		private string GetWindConditions(Wind wind)
+		private string GetWindConditions(Wind wind, bool embolden = true)
 		{
-			return wind != null ? $"<strong>{wind.Speed} {wind.Unit} from {wind.Direction}</strong>" : string.Empty;
+			return wind != null ? $"{(embolden ? "<strong>" : string.Empty)}{wind.Speed} {wind.Unit} from {wind.Direction}{(embolden ? "</strong>" : string.Empty)}" : string.Empty;
 		}
-		
+
 		private async void SendAlert(string subject, string content, bool important = false)
 		{
-			var client = new SendGridClient(Environment.GetEnvironmentVariable("SENDGRID_APIKEY"));
+			var client = new SendGridClient(ConfigurationManager.AppSettings["SENDGRID_APIKEY"]);
 
 			// Send a Single Email using the Mail Helper with convenience methods and initialized SendGridMessage object
 			var msg = new SendGridMessage()
@@ -201,7 +207,7 @@ namespace WeatherNotifications
 				};
 			}
 
-			msg.AddTo(new EmailAddress(Environment.GetEnvironmentVariable("RECIPIENT")));
+			msg.AddTo(new EmailAddress(ConfigurationManager.AppSettings["SENDGRID_RECIPIENT"]));
 
 			var response = await client.SendEmailAsync(msg);
 
@@ -217,9 +223,9 @@ namespace WeatherNotifications
 		private class WindCondition
 		{
 			public bool Alert { get; set; }
-			public int Change { get; set; }
+			public decimal Change { get; set; }
 
-			public WindCondition(bool alert, int change)
+			public WindCondition(bool alert, decimal change)
 			{
 				Alert = alert;
 				Change = change;

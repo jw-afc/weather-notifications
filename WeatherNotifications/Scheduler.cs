@@ -72,16 +72,14 @@ namespace WeatherNotifications
 
 		private Weather GetWeather()
 		{
-			var weather = new Weather();
 			using (var client = new WebClient { Headers = new WebHeaderCollection { "accept:application/json" } })
 			{
-				var json = client.DownloadString(GetWeatherUrlByType("current"));
-				weather.Current = JsonConvert.DeserializeObject<Current>(json);
-
-				json = client.DownloadString(GetWeatherUrlByType("forecast"));
-				weather.Forecast = JsonConvert.DeserializeObject<Forecast>(json);
+				return new Weather
+				{
+					Current = JsonConvert.DeserializeObject<Current>(client.DownloadString(GetWeatherUrlByType("current"))),
+					Forecast = JsonConvert.DeserializeObject<Forecast>(client.DownloadString(GetWeatherUrlByType("forecast")))
+				};
 			}
-			return weather;
 		}
 
 		private void Reset()

@@ -20,7 +20,7 @@ namespace WeatherModel
 
 		public DateTime Date => DateTime.Parse(_date, new CultureInfo("en-GB").DateTimeFormat);
 		
-		public string Time => ParseTime(_time.ToString().PadLeft(4, '0'), Date).ToString("HH:mm");
+		public string Time => ParseTime(_time.ToString().PadLeft(4, '0'), Date).ToString("htt").ToLower();
 
 		public Wind Wind => new Wind
 		{

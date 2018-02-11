@@ -121,7 +121,7 @@ namespace WeatherNotifications
 
 				var sb = new StringBuilder();
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
-				sb.Append($"The forecasted wind conditions exceed the stated maximum ({_maximumWindSpeed} kph): ");
+				sb.Append($"The forecasted wind conditions for {date.DayOfWeek} exceed the stated maximum ({_maximumWindSpeed} kph): ");
 
 				var windCondition = AnalyseForecastDay(day, date.ToString("dd/MM/yyyy"));
 

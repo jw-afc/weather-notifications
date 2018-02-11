@@ -102,7 +102,7 @@ namespace WeatherNotifications
 				var sb = new StringBuilder();
 				sb.Append($"<div><h3>Local Weather - {_postcode}</h3></div>");
 				sb.Append($"The current wind conditions exceed the stated maximum ({_maximumWindSpeed} kph):");
-				sb.Append($"<br />&nbsp; - {TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).ToString("h:mm tt")} - {GetWindConditions(current?.Wind)}{GetChangeIndicator(windCondition.Change, current?.Wind?.Unit ?? string.Empty)}");
+				sb.Append($"<br />&nbsp; - {TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo).ToString("h:mmtt").ToLower()} - {GetWindConditions(current?.Wind)}{GetChangeIndicator(windCondition.Change, current?.Wind?.Unit ?? string.Empty)}");
 				sb.Append($"<br /><br /><a href=\"{WeatherUrl}\">{WeatherUrl}</a>");
 
 				SendAlert($"{_alertSubject} - Alert", sb.ToString(), true);

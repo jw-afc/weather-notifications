@@ -86,16 +86,9 @@ namespace WeatherNotifications
 		{
 			_executionDate = TimeZoneInfo.ConvertTime(DateTime.Now, _timeZoneInfo);
 			Console.WriteLine($"Reset: {_executionDate}");
-
-			_windConditions.Remove("current");
-			foreach (var windCondition in _windConditions.Where(p => DateTime.Parse(p.Key) < _executionDate.Date).ToList())
-			{
+			
+			foreach (var windCondition in _windConditions.Where(p => p.Key == "current" || DateTime.Parse(p.Key) < _executionDate.Date).ToList())
 				_windConditions.Remove(windCondition.Key);
-				Console.WriteLine($"Removed: {windCondition.Key}");
-			}
-
-			foreach (var windCondition in _windConditions)
-				Console.WriteLine($"{windCondition.Key}: High[{windCondition.Value.High}] Low[{windCondition.Value.Low}]");
 		}
 
 		private void AnalyseWeather(Weather weather)

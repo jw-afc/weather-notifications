@@ -30,7 +30,7 @@ namespace Weather.Notifications
 		static IDictionary<string, WindCondition> _windConditions = new Dictionary<string, WindCondition>();
 
 		[FunctionName("Scheduler")]
-		public static void Run([TimerTrigger("0 */2 * * * *")]TimerInfo myTimer, ILogger log, Microsoft.Azure.WebJobs.ExecutionContext context)
+		public static void Run([TimerTrigger("0 */10 * * * *")]TimerInfo myTimer, ILogger log, Microsoft.Azure.WebJobs.ExecutionContext context)
 		{
 			_logger = log;
 

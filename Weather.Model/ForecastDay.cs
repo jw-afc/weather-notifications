@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace WeatherModel
+namespace Weather.Model
 {
 	public class ForecastDay
 	{

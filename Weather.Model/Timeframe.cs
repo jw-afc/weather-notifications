@@ -2,7 +2,7 @@
 using System;
 using System.Globalization;
 
-namespace WeatherModel
+namespace Weather.Model
 {
 	public class Timeframe
 	{

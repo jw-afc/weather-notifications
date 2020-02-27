@@ -118,10 +118,11 @@ namespace Weather.Notifications
 				var day = forecast.Days[i];
 				var date = day.Date;
 				var forecastDay = (i == 0 ? "Today" : date.ToString("dd/MM/yyyy"));
+				var dayOfWeek = date.DayOfWeek;
 
 				var sb = new StringBuilder();
 				sb.Append($"<div><h3>Local Weather - {_config["POSTCODE"]}</h3></div>");
-				sb.Append($"The forecasted wind conditions for {date.DayOfWeek} exceed the stated maximum ({_config["MAXIMUM_WIND_SPEED_IN_KPH"]} kph): ");
+				sb.Append($"The forecasted wind conditions for {dayOfWeek} exceed the stated maximum ({_config["MAXIMUM_WIND_SPEED_IN_KPH"]} kph): ");
 
 				var windCondition = AnalyseForecastDay(day, date.ToString("dd/MM/yyyy"));
 
@@ -139,7 +140,7 @@ namespace Weather.Notifications
 				if (alert)
 				{
 					sb.Append($"<br /><br /><a href=\"{GetWeatherUrl()}\">{GetWeatherUrl()}</a>");
-					SendAlert($"{_alertSubject} - {forecastDay}", sb.ToString());
+					SendAlert($"{_alertSubject} - {dayOfWeek} ({forecastDay})", sb.ToString());
 				}
 			}
 		}

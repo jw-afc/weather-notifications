@@ -204,7 +204,7 @@ namespace Weather.Notifications
 			// Send a Single Email using the Mail Helper with convenience methods and initialized SendGridMessage object
 			var msg = new SendGridMessage()
 			{
-				From = new EmailAddress("no-reply@sendgrid.com"),
+				From = new EmailAddress(_config["SENDGRID_FROM"]),
 				Subject = subject,
 				HtmlContent = content
 			};

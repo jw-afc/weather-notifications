@@ -12,7 +12,7 @@
 
 		public void Update(decimal speed)
 		{
-			High = speed > High ? speed : High;
+			High = speed < High ? speed : High;
 			Low = speed < Low ? speed : Low;
 		}
 	}

@@ -8,7 +8,6 @@
 		public WindCondition(decimal speed)
 		{
 			High = Low = speed;
-			High = Low;
 		}
 
 		public void Update(decimal speed)
